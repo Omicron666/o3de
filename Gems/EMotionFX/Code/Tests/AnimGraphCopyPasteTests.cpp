@@ -66,6 +66,18 @@ namespace EMotionFX
                 && (paramterActionA->GetParameterName() == paramterActionB->GetParameterName());
         }
 
+        void TearDown() override
+        {
+            if (m_animGraphInstance)
+            {
+                m_animGraphInstance->Destroy();
+                m_animGraphInstance = nullptr;
+            }
+            m_motionNodeAnimGraph.reset();
+
+            AnimGraphFixture::TearDown();
+        }
+
         AZStd::unique_ptr<TwoMotionNodeAnimGraph> m_motionNodeAnimGraph;
         AnimGraphNode* m_stateA = nullptr;
         AnimGraphNode* m_stateB = nullptr;
@@ -207,6 +219,19 @@ namespace EMotionFX
             }
         }
 
+        void TearDown() override
+        {
+            if (m_animGraphInstance)
+            {
+                m_animGraphInstance->Destroy();
+                m_animGraphInstance = nullptr;
+            }
+            m_motionNodeAnimGraph.reset();
+
+            AnimGraphFixture::TearDown();
+        }
+
+
         AZStd::unique_ptr<TwoMotionNodeAnimGraph> m_motionNodeAnimGraph;
         AnimGraphNode* m_stateA = nullptr;
         AnimGraphNode* m_stateB = nullptr;
@@ -259,7 +284,7 @@ namespace EMotionFX
         VerifyAfterOperation();
     }
 
-    INSTANTIATE_TEST_CASE_P(AnimGraphCopyPasteTests,
+    INSTANTIATE_TEST_SUITE_P(AnimGraphCopyPasteTests,
         AnimGraphTransitionConditionCopyPasteFixture,
         ::testing::Bool());
 
@@ -478,7 +503,7 @@ namespace EMotionFX
         }
     }
 
-    INSTANTIATE_TEST_CASE_P(AnimGraphCopyPasteTests,
+    INSTANTIATE_TEST_SUITE_P(AnimGraphCopyPasteTests,
         AnimGraphSimpleCopyPasteFixture,
         ::testing::Bool());
 
@@ -519,6 +544,18 @@ namespace EMotionFX
             AZStd::vector<AnimGraphConnectionId> canBeInterruptedBy = { m_transitionAC->GetId() };
             m_transitionAB->SetCanBeInterruptedBy(canBeInterruptedBy);
             m_motionNodeAnimGraph->InitAfterLoading();
+        }
+
+        void TearDown() override
+        {
+            if (m_animGraphInstance)
+            {
+                m_animGraphInstance->Destroy();
+                m_animGraphInstance = nullptr;
+            }
+            m_motionNodeAnimGraph.reset();
+
+            AnimGraphFixture::TearDown();
         }
 
     public:
@@ -591,7 +628,7 @@ namespace EMotionFX
         }
     }
 
-    INSTANTIATE_TEST_CASE_P(CopyPasteTests,
+    INSTANTIATE_TEST_SUITE_P(CopyPasteTests,
         AnimGraphCopyPasteFixture_CanBeInterruptedBy,
         ::testing::Bool());
 
@@ -660,7 +697,6 @@ namespace EMotionFX
         }
 
     public:
-        AZStd::unique_ptr<OneBlendTreeNodeAnimGraph> m_blendTreeAnimGraph;
         AZStd::unique_ptr<EMotionFX::BlendTreeConnection> m_testConnection;
         AnimGraphBindPoseNode* m_bindPoseNodeA = nullptr;
         AnimGraphBindPoseNode* m_bindPoseNodeB = nullptr;
@@ -757,7 +793,7 @@ namespace EMotionFX
             "New connection's parameter weight should be the weight value of 1.";
     }
 
-    INSTANTIATE_TEST_CASE_P(AnimGraphCopyPasteTests,
+    INSTANTIATE_TEST_SUITE_P(AnimGraphCopyPasteTests,
         AnimGraphCopyPasteFixture_NodeTriggerValue,
         ::testing::Bool());
 } // namespace EMotionFX
