@@ -6,76 +6,57 @@
  *
  */
 
-#include <Atom/RHI/ImageView.h>
-#include <Atom/RHI/Image.h>
+ #include <Atom/RHI/ImageView.h>
+ #include <Atom/RHI/Image.h>
 
-namespace AZ
+ namespace AZ::RHI
 {
-    namespace RHI
-    {
-        ResultCode ImageView::Init(const Image& image, const ImageViewDescriptor& viewDescriptor)
+        //! Given a device index, return the corresponding DeviceBufferView for the selected device
+        const RHI::Ptr<RHI::DeviceImageView> ImageView::GetDeviceImageView(int deviceIndex) const
         {
-            if (!ValidateForInit(image, viewDescriptor))
+            AZStd::lock_guard lock(m_imageViewMutex);
+    
+            if (m_image->GetDeviceMask() != m_deviceMask)
             {
-                return ResultCode::InvalidOperation;
+                m_deviceMask = m_image->GetDeviceMask();
+    
+                MultiDeviceObject::IterateDevices(
+                    m_deviceMask,
+                    [this](int deviceIndex)
+                    {
+                        if (auto it{ m_cache.find(deviceIndex) }; it != m_cache.end())
+                        {
+                            m_cache.erase(it);
+                        }
+                        return true;
+                    });
             }
-
-            m_descriptor = viewDescriptor;
-            m_hash = image.GetHash();
-            m_hash = TypeHash64(m_descriptor.GetHash(), m_hash);
-            return ResourceView::Init(image);
-        }
-
-        bool ImageView::ValidateForInit(const Image& image, const ImageViewDescriptor& viewDescriptor) const
-        {
-            if (Validation::IsEnabled())
+    
+            auto iterator{ m_cache.find(deviceIndex) };
+            if (iterator == m_cache.end())
             {
-                if (IsInitialized())
+                //! Image view is not yet in the cache
+                auto [new_iterator, inserted]{ m_cache.insert(
+                    AZStd::make_pair(deviceIndex, m_image->GetDeviceImage(deviceIndex)->GetImageView(m_descriptor))) };
+                if (inserted)
                 {
-                    AZ_Warning("ImageView", false, "Image view already initialized");
-                    return false;
-                }
-
-                if (!image.IsInitialized())
-                {
-                    AZ_Warning("ImageView", false, "Attempting to create view from uninitialized image '%s'.", image.GetName().GetCStr());
-                    return false;
-                }
-
-                if (!CheckBitsAll(image.GetDescriptor().m_bindFlags, viewDescriptor.m_overrideBindFlags))
-                {
-                    AZ_Warning("ImageView", false, "Image view has bind flags that are incompatible with the underlying image.");
-            
-                    return false;
+                    return new_iterator->second;
                 }
             }
-
-            return true;
+            else if (&iterator->second->GetImage() != m_image->GetDeviceImage(deviceIndex).get())
+            {
+                iterator->second = m_image->GetDeviceImage(deviceIndex)->GetImageView(m_descriptor);
+            }
+    
+            return iterator->second;
         }
 
-        const ImageViewDescriptor& ImageView::GetDescriptor() const
+        void ImageView::Shutdown()
         {
-            return m_descriptor;
+            if(m_image->IsInitialized())
+            {
+                m_image->EraseResourceView(static_cast<ResourceView*>(this));
+                m_image = nullptr;
+            }
         }
-
-        const Image& ImageView::GetImage() const
-        {
-            return static_cast<const Image&>(GetResource());
-        }
-
-        bool ImageView::IsFullView() const
-        {
-            const ImageDescriptor& imageDescriptor = GetImage().GetDescriptor();
-            return
-                m_descriptor.m_arraySliceMin == 0 &&
-                (m_descriptor.m_arraySliceMax + 1) >= imageDescriptor.m_arraySize &&
-                m_descriptor.m_mipSliceMin == 0 &&
-                (m_descriptor.m_mipSliceMax + 1) >= imageDescriptor.m_mipLevels;
-        }
-
-        HashValue64 ImageView::GetHash() const
-        {
-            return m_hash;
-        }
-    }
 }
