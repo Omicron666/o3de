@@ -12,6 +12,7 @@
 #include <AzFramework/Components/CameraBus.h>
 #include <CryCommon/Maestro/Types/AnimParamType.h>
 #include <CryCommon/Maestro/Types/AnimValueType.h>
+#include "EditorDefs.h"
 #include "TrackViewKeyPropertiesDlg.h"
 #endif
 
@@ -36,7 +37,7 @@ public:
     {
         return trackType == eAnimCurveType_BezierFloat;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 0; }
@@ -98,7 +99,7 @@ public:
         return valueType == AnimValueType::AssetBlend;
     }
 
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -145,7 +146,7 @@ public:
     {
         return paramType == AnimParamType::Capture;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -207,7 +208,7 @@ public:
     {
         return paramType == AnimParamType::CommentText;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -240,7 +241,7 @@ public:
     {
         return paramType == AnimParamType::Console;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -282,7 +283,7 @@ public:
     {
         return paramType == AnimParamType::Event;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -324,7 +325,7 @@ public:
             return false;
         }
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -390,7 +391,7 @@ public:
 
     //-----------------------------------------------------------------------------
     //!
-    bool OnKeySelectionChange(CTrackViewKeyBundle& keys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& keys) override;
 
     //-----------------------------------------------------------------------------
     //!
@@ -437,7 +438,7 @@ public:
     {
         return valueType == AnimValueType::Select;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -465,6 +466,8 @@ protected:
 private:
 
     void ResetCameraEntries();
+
+    static constexpr const char* defaultNoneKeyName = "<None>"; // Name used in menu when no camera is selected
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -490,7 +493,7 @@ public:
     {
         return paramType == AnimParamType::Sequence;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -535,7 +538,7 @@ public:
     {
         return paramType == AnimParamType::Sound;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -575,7 +578,7 @@ public:
     {
         return paramType == AnimParamType::TimeRanges;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -610,7 +613,7 @@ public:
     {
         return paramType == AnimParamType::TrackEvent;
     }
-    bool OnKeySelectionChange(CTrackViewKeyBundle& selectedKeys) override;
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
     void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
 
     unsigned int GetPriority() const override { return 1; }
@@ -636,5 +639,35 @@ private:
         static const char* addEventString = "Add a new event...";
 
         return addEventString;
+    }
+};
+
+//////////////////////////////////////////////////////////////////////////
+class CStringKeyUIControls
+    : public CTrackViewKeyUIControls
+{
+public:
+    CSmartVariableArray mv_table;
+    CSmartVariableEnum<QString> mv_value;
+
+    void OnCreateVars() override
+    {
+        AddVariable(mv_table, "Key Properties");
+        AddVariable(mv_table, mv_value, "Value");
+    }
+    bool SupportTrackType([[maybe_unused]] const CAnimParamType& paramType, [[maybe_unused]] EAnimCurveType trackType, AnimValueType valueType) const override
+    {
+        return valueType == AnimValueType::String;
+    }
+    bool OnKeySelectionChange(const CTrackViewKeyBundle& selectedKeys) override;
+    void OnUIChange(IVariable* pVar, CTrackViewKeyBundle& selectedKeys) override;
+
+    unsigned int GetPriority() const override { return 1; }
+
+    static const GUID& GetClassID()
+    {
+        // {E056F001-A2DF-4E87-8DBB-980A651940DC}
+        static const GUID guid = { 0xe056f001, 0xa2df, 0x4e87, { 0x8d, 0xbb, 0x98, 0x0a, 0x65, 0x19, 0x40, 0xdc } };
+        return guid;
     }
 };

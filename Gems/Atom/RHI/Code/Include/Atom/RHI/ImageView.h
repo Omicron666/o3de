@@ -5,50 +5,72 @@
  * SPDX-License-Identifier: Apache-2.0 OR MIT
  *
  */
-#pragma once
+ #pragma once
 
-#include <Atom/RHI.Reflect/ImageViewDescriptor.h>
-#include <Atom/RHI/ResourceView.h>
+ #include <Atom/RHI.Reflect/ImageViewDescriptor.h>
+ #include <Atom/RHI/Resource.h>
+ #include <Atom/RHI/Image.h>
 
-namespace AZ
+ namespace AZ::RHI
 {
-    namespace RHI
+    class DeviceImage;
+
+    //! A ImageView is a light-weight representation of a view onto a multi-device image.
+    //! It holds a ConstPtr to a multi-device image as well as an ImageViewDescriptor
+    //! Using both, single-device ImageViews can be retrieved
+    class ImageView : public ResourceView
     {
-        class Image;
+    public:
+        AZ_RTTI(ImageView, "{AB366B8F-F1B7-45C6-A0D8-475D4834FAD2}", ResourceView);
+        virtual ~ImageView() = default;
 
-        //! ImageView contains a platform-specific descriptor mapping to a sub-region of an image resource.
-        //! It associates 1-to-1 with a ImageViewDescriptor. Image views map to a subset of image sub-resources
-        //! (mip levels / array slices). They can additionally override the base format of the image
-        class ImageView
-            : public ResourceView
+        ImageView(const RHI::Image* image, ImageViewDescriptor descriptor, MultiDevice::DeviceMask deviceMask)
+            : m_image{ image }
+            , m_descriptor{ descriptor }
+            , m_deviceMask{ deviceMask }
         {
-        public:
-            AZ_RTTI(ImageView, "{F2BDEE1F-DEFD-4443-9012-A28AED028D7B}", ResourceView);
-            virtual ~ImageView() = default;
+        }
 
-            //! Initializes the image view.
-            ResultCode Init(const Image& image, const ImageViewDescriptor& viewDescriptor);
+        //! Given a device index, return the corresponding DeviceImageView for the selected device
+        const RHI::Ptr<RHI::DeviceImageView> GetDeviceImageView(int deviceIndex) const;
 
-            //! Returns the view descriptor used at initialization time.
-            const ImageViewDescriptor& GetDescriptor() const;
+        //! Return the contained multi-device image
+        const RHI::Image* GetImage() const
+        {
+            return m_image.get();
+        }
 
-            //! Returns the image associated with this view.
-            const Image& GetImage() const;
+        //! Return the contained ImageViewDescriptor
+        const ImageViewDescriptor& GetDescriptor() const
+        {
+            return m_descriptor;
+        }
 
-            //! Returns whether the view covers the entire image (i.e. isn't just a subset).
-            bool IsFullView() const override final;
+        const Resource* GetResource() const override
+        {
+            return m_image.get();
+        }
 
-            //! Returns the hash of the view.
-            HashValue64 GetHash() const;
+        const DeviceResourceView* GetDeviceResourceView(int deviceIndex) const override
+        {
+            return GetDeviceImageView(deviceIndex).get();
+        }
 
-        protected:
-            HashValue64 m_hash = HashValue64{ 0 };
+        void Shutdown() final;
 
-        private:
-            bool ValidateForInit(const Image& image, const ImageViewDescriptor& viewDescriptor) const;
-
-            // The RHI descriptor for this view.
-            ImageViewDescriptor m_descriptor;
-        };
-    }
+    private:
+        //! Safe-guard access to DeviceImageView cache during parallel access
+        mutable AZStd::mutex m_imageViewMutex;
+        //! A raw pointer to a multi-device image
+        ConstPtr<RHI::Image> m_image;
+        //! The corresponding ImageViewDescriptor for this view.
+        ImageViewDescriptor m_descriptor;
+        //! The device mask of the image stored for comparison to figure out when cache entries need to be freed.
+        mutable MultiDevice::DeviceMask m_deviceMask = MultiDevice::AllDevices;
+        //! DeviceImageView cache
+        //! This cache is necessary as the caller receives raw pointers from the ResourceCache,
+        //! which now, with multi-device objects in use, need to be held in memory as long as
+        //! the multi-device view is held.
+        mutable AZStd::unordered_map<int, Ptr<RHI::DeviceImageView>> m_cache;
+    };
 }

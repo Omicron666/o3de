@@ -6,82 +6,73 @@
  *
  */
 
-#include <Atom/RHI/BufferView.h>
-#include <Atom/RHI/Buffer.h>
+ #include <Atom/RHI/BufferView.h>
+ #include <Atom/RHI/Buffer.h>
 
-namespace AZ
-{
-    namespace RHI
+ namespace AZ::RHI
+ {
+    //! Given a device index, return the corresponding DeviceBufferView for the selected device
+    const RHI::Ptr<RHI::DeviceBufferView> BufferView::GetDeviceBufferView(int deviceIndex) const
     {
-        ResultCode BufferView::Init(const Buffer& buffer, const BufferViewDescriptor& viewDescriptor)
+        AZStd::lock_guard lock(m_bufferViewMutex);
+
+        if (m_buffer->GetDeviceMask() != m_deviceMask)
         {
-            if (!ValidateForInit(buffer, viewDescriptor))
+            m_deviceMask = m_buffer->GetDeviceMask();
+
+            MultiDeviceObject::IterateDevices(
+                m_deviceMask,
+                [this](int deviceIndex)
+                {
+                    if (auto it{ m_cache.find(deviceIndex) }; it != m_cache.end())
+                    {
+                        m_cache.erase(it);
+                    }
+                    return true;
+                });
+        }
+
+        auto iterator{ m_cache.find(deviceIndex) };
+        if (iterator == m_cache.end())
+        {
+            //! Buffer view is not yet in the cache
+            auto [new_iterator, inserted]{ m_cache.insert(
+                AZStd::make_pair(deviceIndex, m_buffer->GetDeviceBuffer(deviceIndex)->GetBufferView(m_descriptor))) };
+            if (inserted)
             {
-                return ResultCode::InvalidOperation;
+                return new_iterator->second;
             }
-            if (Validation::IsEnabled())
+        }
+        // Add null check for `iterator->second` to avoid empty pointer
+        else if (!iterator->second || &iterator->second->GetBuffer() != m_buffer->GetDeviceBuffer(deviceIndex).get())
+        {
+            iterator->second = m_buffer->GetDeviceBuffer(deviceIndex)->GetBufferView(m_descriptor);
+        }
+
+        return iterator->second;
+    }
+
+    AZStd::unordered_map<int, uint32_t> BufferView::GetBindlessReadIndex() const
+    {
+        AZStd::unordered_map<int, uint32_t> result;
+
+        MultiDeviceObject::IterateDevices(
+            m_buffer->GetDeviceMask(),
+            [this, &result](int deviceIndex)
             {
-                // Check buffer view does not reach outside buffer's memory
-                if (buffer.GetDescriptor().m_byteCount < (viewDescriptor.m_elementOffset + viewDescriptor.m_elementCount) * viewDescriptor.m_elementSize)
-                {
-                    AZ_Warning("BufferView", false, "Buffer view out of boundaries of buffer's memory.");
-                    return ResultCode::OutOfMemory;
-                }
-            }
+                result[deviceIndex] = GetDeviceBufferView(deviceIndex)->GetBindlessReadIndex();
+                return true;
+            });
 
-            m_descriptor = viewDescriptor;
-            m_hash = buffer.GetHash();
-            m_hash = TypeHash64(m_descriptor.GetHash(), m_hash);
-            return ResourceView::Init(buffer);
-        }
+        return result;
+    }
 
-        bool BufferView::ValidateForInit(const Buffer& buffer, const BufferViewDescriptor& viewDescriptor) const
+    void BufferView::Shutdown()
+    {
+        if(m_buffer->IsInitialized())
         {
-            if (Validation::IsEnabled())
-            {
-                if (IsInitialized())
-                {
-                    AZ_Warning("BufferView", false, "Buffer view already initialized");
-                    return false;
-                }
-
-                if (!buffer.IsInitialized())
-                {
-                    AZ_Warning("BufferView", false, "Attempting to create view from uninitialized buffer '%s'.", buffer.GetName().GetCStr());
-                    return false;
-                }
-
-                if (!CheckBitsAll(buffer.GetDescriptor().m_bindFlags, viewDescriptor.m_overrideBindFlags))
-                {
-                    AZ_Warning("BufferView", false, "Buffer view has bind flags that are incompatible with the underlying buffer.");
-            
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        const BufferViewDescriptor& BufferView::GetDescriptor() const
-        {
-            return m_descriptor;
-        }
-
-        const Buffer& BufferView::GetBuffer() const
-        {
-            return static_cast<const Buffer&>(GetResource());
-        }
-
-        bool BufferView::IsFullView() const
-        {
-            const BufferDescriptor& bufferDescriptor = GetBuffer().GetDescriptor();
-            const uint32_t bufferViewSize = m_descriptor.m_elementCount * m_descriptor.m_elementSize;
-            return m_descriptor.m_elementOffset == 0 && bufferViewSize >= bufferDescriptor.m_byteCount;
-        }
-
-        HashValue64 BufferView::GetHash() const
-        {
-            return m_hash;
+            m_buffer->EraseResourceView(static_cast<ResourceView*>(this));
+            m_buffer = nullptr;
         }
     }
-}
+ }
